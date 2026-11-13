@@ -3,7 +3,12 @@ import {
   daysBetween, workdaysSpan, snapWorking, DEFAULT_WORKDAYS
 } from './scheduler.js';
 import * as store from './store.js';
-import { firebaseConfig, ALLOWED_DOMAIN, PROJECT_NAME } from './config.js';
+import { firebaseConfig, ALLOWED_DOMAIN, PROJECT_NAME, SCHEDULE_PATH } from './config.js';
+
+/* Two charts served from the same github.io account share a browser origin, so
+   a single key would let one chart's column widths and toggles follow you into
+   the other. Key them per project instead. */
+const PREFS_KEY = `gantt.prefs.${firebaseConfig.projectId || 'default'}.${SCHEDULE_PATH}`;
 
 /* ==========================================================================
    Constants
@@ -41,7 +46,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 
 /* Which build is running. Shown in the Account menu so there is never any
    doubt about whether a deploy actually landed. */
-const BUILD = '2026-11-12a';
+const BUILD = '2026-11-12b';
 
 /* ==========================================================================
    State
@@ -72,7 +77,9 @@ const el = id => document.getElementById(id);
 /* remember column widths and zoom per browser */
 function loadPrefs() {
   try {
-    const p = JSON.parse(localStorage.getItem('gantt.prefs') || '{}');
+    /* fall back to the old shared key once, so existing settings carry over */
+    const raw = localStorage.getItem(PREFS_KEY) || localStorage.getItem('gantt.prefs') || '{}';
+    const p = JSON.parse(raw);
     if (p.order) {
       const rank = new Map(p.order.map((k, i) => [k, i]));
       COLS.sort((a, b) => (rank.get(a.key) ?? 99) - (rank.get(b.key) ?? 99));
@@ -90,7 +97,7 @@ function savePrefs() {
   try {
     const widths = {}, hidden = {};
     COLS.forEach(c => { widths[c.key] = c.w; if (c.hidden) hidden[c.key] = true; });
-    localStorage.setItem('gantt.prefs', JSON.stringify({
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
       widths, hidden, order: COLS.map(c => c.key), zoom: S.zoom,
       exportOpts: S.exportOpts, labels: S.labels, showOutline: S.showOutline
     }));
